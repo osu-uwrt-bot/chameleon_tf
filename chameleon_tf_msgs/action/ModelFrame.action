@@ -1,0 +1,16 @@
+# request
+# the frames to monitor
+string monitor_parent
+string monitor_child
+
+# the number of samples to use during average
+uint16 samples 10
+
+---
+# response
+bool success
+string err_msg ""
+
+---
+# feedback
+uint16 sample_count
