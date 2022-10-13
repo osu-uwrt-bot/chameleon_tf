@@ -13,6 +13,8 @@
 
 #include <chrono>
 
+#include "chameleon_tf/transform_stats.hpp"
+
 using namespace std::chrono_literals;
 using namespace std::placeholders;
 
@@ -34,6 +36,8 @@ public:
     // declared order is xyz for trans and rpy for rot
     declare_parameter<std::vector<double>>("initial_translation");
     declare_parameter<std::vector<double>>("initial_rotation");
+    // thresholding while observing
+    declare_parameter<double>("stddev_threshold", 0.1);
 
     // retrieve param values
     lastRelationship = geometry_msgs::msg::Transform();
@@ -44,6 +48,8 @@ public:
     // now we check the frame ID's
     sourceName = get_parameter("source_frame").as_string();
     destName = get_parameter("target_frame").as_string();
+
+    stddevLimit = get_parameter("stddev_threshold").as_double();
 
     /*
     Create the ROS contexts
@@ -125,7 +131,7 @@ public:
   }
 
   // action handle goal
-  rclcpp_action::GoalResponse handleGoal(const rclcpp_action::GoalUUID& uuid,
+  rclcpp_action::GoalResponse handleGoal(const rclcpp_action::GoalUUID &uuid,
                                          std::shared_ptr<const ModelFrame::Goal> goal)
   {
     RCLCPP_INFO_STREAM(get_logger(),
@@ -153,7 +159,7 @@ public:
   {
     using namespace std::placeholders;
     // this needs to return quickly to avoid blocking the executor, so spin up a new thread
-    std::thread{ std::bind(&MobileTfPub::execute, this, _1), goal_handle }.detach();
+    std::thread{std::bind(&MobileTfPub::execute, this, _1), goal_handle}.detach();
   }
 
   void execute(const std::shared_ptr<GHModelFrame> goal_handle)
@@ -167,7 +173,7 @@ public:
     sampleCount = 0;
 
     // make a vector of transforms
-    std::vector<geometry_msgs::msg::TransformStamped> transforms;
+    std::vector<geometry_msgs::msg::Transform> transforms;
 
     // confirm connected TF tree
     // check the trasform exists and is connected
@@ -175,9 +181,9 @@ public:
     try
     {
       t = tfBuffer->lookupTransform(goal->monitor_child, goal->monitor_parent, get_clock()->now());
-      transforms.push_back(t);
+      transforms.push_back(t.transform);
     }
-    catch (const tf2::TransformException& ex)
+    catch (const tf2::TransformException &ex)
     {
       // if we cant lookup, abort
       result->err_msg = "TF Lookup failed";
@@ -196,12 +202,12 @@ public:
       try
       {
         t = tfBuffer->lookupTransform(goal->monitor_child, goal->monitor_parent, get_clock()->now());
-        transforms.push_back(t);
+        transforms.push_back(t.transform);
 
         // increment the counter for success
         sampleCount = transforms.size();
       }
-      catch (const tf2::TransformException& ex)
+      catch (const tf2::TransformException &ex)
       {
       }
 
@@ -223,10 +229,35 @@ public:
     }
 
     // now we need to figure out how to average the transforms
+    auto stats = tf_stats::getTransformStats(transforms);
 
     // if the stddev is too high, abort -- this is the final abort metric
+    // first check euclidean distance on translation
+    double distErr = tf_stats::euclideanDist(stats.stddev.translation);
+    if (distErr > stddevLimit)
+    {
+      // too high, abort
+      result->err_msg = "Translation deviation above threshold";
+      result->success = false;
+
+      goal_handle->abort(result);
+      return;
+    }
+
+    // now check rotation, because of quaternion, this may be funky
+    double rotErr = tf_stats::quatDistance(stats.stddev.rotation);
+    if (rotErr > stddevLimit)
+    {
+      // too high, abort
+      result->err_msg = "Rotation deviation above threshold";
+      result->success = false;
+
+      goal_handle->abort(result);
+      return;
+    }
 
     // if still okay, update our transform and succeed
+    lastRelationship = stats.avg;
     result->err_msg = "";
     result->success = true;
 
@@ -237,6 +268,8 @@ protected:
   geometry_msgs::msg::Transform lastRelationship;
 
   std::string sourceName, destName;
+
+  double stddevLimit = 0.0;
 
   // set to this when the action server is not running
   int sampleCount = -1;
@@ -252,7 +285,7 @@ protected:
   rclcpp_action::Server<ModelFrame>::SharedPtr modelAction;
 };
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
   rclcpp::init(argc, argv);
 

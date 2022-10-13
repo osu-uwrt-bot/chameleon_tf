@@ -3,9 +3,9 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     node = Node(
-        package="mobile_tf",
-        executable="mobile_tf",
-        name="mobile_tf_broadcaster",
+        package="chameleon_tf",
+        executable="chameleon_tf",
+        name="chameleon_tf",
         output="screen",
         parameters=[
             {"source_frame": "frame_a"},

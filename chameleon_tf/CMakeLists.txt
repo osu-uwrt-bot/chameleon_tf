@@ -16,12 +16,12 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(chameleon_tf_msgs REQUIRED)
 
 
-add_executable(mobile_tf src/mobile_tf.cpp)
-target_include_directories(mobile_tf PUBLIC
+add_executable(chameleon_tf src/mobile_tf.cpp)
+target_include_directories(chameleon_tf PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_compile_features(mobile_tf PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-ament_target_dependencies(mobile_tf
+target_compile_features(chameleon_tf PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+ament_target_dependencies(chameleon_tf
   geometry_msgs
   tf2_geometry_msgs
   rclcpp
@@ -30,7 +30,7 @@ ament_target_dependencies(mobile_tf
   chameleon_tf_msgs
 )
 
-install(TARGETS mobile_tf
+install(TARGETS chameleon_tf
   DESTINATION lib/${PROJECT_NAME})
 
 # Install launch files.
