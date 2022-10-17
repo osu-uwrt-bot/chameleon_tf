@@ -3,6 +3,7 @@
 #include <vector>
 #include <cmath>
 #include <geometry_msgs/msg/transform.hpp>
+#include <iostream>
 
 namespace tf_stats
 {
@@ -24,7 +25,7 @@ namespace tf_stats
         {
             total += sample;
         }
-        container.avg = total / samples.size();
+        container.avg = total / (double)samples.size();
 
         // now the stddev
         double sumSq = 0.0;
@@ -32,7 +33,7 @@ namespace tf_stats
         {
             sumSq += pow((sample - container.avg), 2);
         }
-        double stddev = sqrt(sumSq / samples.size() - 1);
+        container.stddev = sqrt(sumSq / (samples.size() - 1));
 
         return container;
     }
@@ -45,6 +46,19 @@ namespace tf_stats
     // While not techincally correct, this should accomplish the goal for now
     double quatDistance(const geometry_msgs::msg::Quaternion & input){
         return sqrt(pow(input.x, 2) + pow(input.y, 2) + pow(input.z, 2) + pow(input.w, 2));
+    }
+
+    template<typename T>
+    std::ostream& operator<< (std::ostream& out, const std::vector<T>& v) {
+        out << "[";
+        size_t last = v.size() - 1;
+        for (size_t i = 0; i < v.size(); ++i) {
+            out << v[i];
+            if (i != last)
+                out << ", ";
+        }
+        out << "]";
+        return out;
     }
 
     StatsContainer<geometry_msgs::msg::Transform> getTransformStats(
@@ -104,8 +118,8 @@ namespace tf_stats
         // pack the container
         container.avg.translation = avgT;
         container.avg.rotation = avgR;
-        container.avg.translation = stddevT;
-        container.avg.rotation = stddevR;
+        container.stddev.translation = stddevT;
+        container.stddev.rotation = stddevR;
 
         return container;
     }

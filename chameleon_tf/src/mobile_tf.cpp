@@ -42,12 +42,12 @@ public:
     // retrieve param values
     lastRelationship = geometry_msgs::msg::Transform();
 
-    // configure the initial transformation
-    configureInitTF();
-
     // now we check the frame ID's
     sourceName = get_parameter("source_frame").as_string();
     destName = get_parameter("target_frame").as_string();
+
+    // configure the initial transformation
+    configureInitTF();
 
     stddevLimit = get_parameter("stddev_threshold").as_double();
 
@@ -56,7 +56,7 @@ public:
     */
 
     // timer context for sending the transform
-    pubTimer = create_wall_timer(1s, std::bind(&MobileTfPub::tfPublishCallback, this));
+    pubTimer = create_wall_timer(2s, std::bind(&MobileTfPub::tfPublishCallback, this));
 
     // Initialize the transform broadcaster
     tfBroadcaster = std::make_unique<tf2_ros::StaticTransformBroadcaster>(*this);
@@ -104,6 +104,14 @@ public:
 
     // build the angular quat message
     lastRelationship.rotation = tf2::toMsg(quat);
+
+    RCLCPP_INFO_STREAM(get_logger(), "Initial translation: (" << lastRelationship.translation.x << ", "
+                                                              << lastRelationship.translation.y << ", "
+                                                              << lastRelationship.translation.z << ")");
+
+    RCLCPP_INFO_STREAM(get_logger(), "Initial rotation: (" << quat.getX() << ", " << quat.getY() << ", "
+                                                           << quat.getZ() << ", " << quat.getW() << ")");
+    RCLCPP_INFO_STREAM(get_logger(), "Transforming from " << sourceName << " -> " << destName);
   }
 
   // callback function for the transform publish timer
@@ -135,7 +143,7 @@ public:
                                          std::shared_ptr<const ModelFrame::Goal> goal)
   {
     RCLCPP_INFO_STREAM(get_logger(),
-                       "Received request to watch frames " << goal->monitor_parent << " -> " << goal->monitor_child);
+                       "Received request to watch transform " << goal->monitor_parent << " -> " << goal->monitor_child);
     (void)uuid;
 
     // see if we are already executing
@@ -164,7 +172,7 @@ public:
 
   void execute(const std::shared_ptr<GHModelFrame> goal_handle)
   {
-    rclcpp::Rate loopRate(0.1);
+    rclcpp::Rate loopRate(1);
     const auto goal = goal_handle->get_goal();
     auto feedback = std::make_shared<ModelFrame::Feedback>();
     auto result = std::make_shared<ModelFrame::Result>();
@@ -180,7 +188,7 @@ public:
     geometry_msgs::msg::TransformStamped t;
     try
     {
-      t = tfBuffer->lookupTransform(goal->monitor_child, goal->monitor_parent, get_clock()->now());
+      t = tfBuffer->lookupTransform(goal->monitor_parent, goal->monitor_child, get_clock()->now());
       transforms.push_back(t.transform);
     }
     catch (const tf2::TransformException &ex)
@@ -201,7 +209,7 @@ public:
       // lookup the current transform
       try
       {
-        t = tfBuffer->lookupTransform(goal->monitor_child, goal->monitor_parent, get_clock()->now());
+        t = tfBuffer->lookupTransform(goal->monitor_parent, goal->monitor_child, get_clock()->now());
         transforms.push_back(t.transform);
 
         // increment the counter for success
@@ -212,7 +220,7 @@ public:
       }
 
       // check to see if we have done more than 2x the iterations we should have
-      if (iterations < 2 * goal->samples)
+      if (iterations > 2 * goal->samples)
       {
         // something isnt working, so we abort
         result->err_msg = "Unable to get required samples during expected duration";
@@ -222,6 +230,15 @@ public:
         return;
       }
 
+      if (goal_handle->is_canceling())
+      {
+        RCLCPP_INFO(this->get_logger(), "Cancelling observations");
+        return;
+      }
+
+      feedback->sample_count = sampleCount;
+      goal_handle->publish_feedback(feedback);
+
       iterations++;
 
       // wait a bit
@@ -229,6 +246,7 @@ public:
     }
 
     // now we need to figure out how to average the transforms
+    RCLCPP_INFO(this->get_logger(), "Computing statistics");
     auto stats = tf_stats::getTransformStats(transforms);
 
     // if the stddev is too high, abort -- this is the final abort metric
@@ -237,7 +255,7 @@ public:
     if (distErr > stddevLimit)
     {
       // too high, abort
-      result->err_msg = "Translation deviation above threshold";
+      result->err_msg = "Translation deviation above threshold " + std::to_string(distErr);
       result->success = false;
 
       goal_handle->abort(result);
@@ -246,10 +264,11 @@ public:
 
     // now check rotation, because of quaternion, this may be funky
     double rotErr = tf_stats::quatDistance(stats.stddev.rotation);
-    if (rotErr > stddevLimit)
+    // TODO Remove this * 10 whe i come up with an accurate err calc
+    if (rotErr > stddevLimit * 10)
     {
       // too high, abort
-      result->err_msg = "Rotation deviation above threshold";
+      result->err_msg = "Rotation deviation above threshold " + std::to_string(rotErr);
       result->success = false;
 
       goal_handle->abort(result);
@@ -258,6 +277,17 @@ public:
 
     // if still okay, update our transform and succeed
     lastRelationship = stats.avg;
+
+    RCLCPP_INFO_STREAM(get_logger(), "Assumed translation: (" << lastRelationship.translation.x << ", "
+                                                              << lastRelationship.translation.y << ", " 
+                                                              << lastRelationship.translation.z << ")");
+
+    RCLCPP_INFO_STREAM(get_logger(), "Assumed rotation: (" << lastRelationship.rotation.x << ", " 
+                                                           << lastRelationship.rotation.y << ", "
+                                                           << lastRelationship.rotation.z << ", " 
+                                                           << lastRelationship.rotation.w << ")");
+
+    
     result->err_msg = "";
     result->success = true;
 
