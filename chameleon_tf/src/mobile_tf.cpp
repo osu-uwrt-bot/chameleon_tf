@@ -67,11 +67,11 @@ public:
 
     // Initialize a service server for moving the transform
     setService = create_service<chameleon_tf_msgs::srv::SetTransform>(
-        "/set_transform", std::bind(&MobileTfPub::serviceCallback, this, _1, _2));
+        destName + "/set_transform", std::bind(&MobileTfPub::serviceCallback, this, _1, _2));
 
     // Initialize an action server for moving the transform based on sampling another transform
     modelAction = rclcpp_action::create_server<ModelFrame>(
-        this, "/model_tf", std::bind(&MobileTfPub::handleGoal, this, _1, _2),
+        this, destName + "/model_tf", std::bind(&MobileTfPub::handleGoal, this, _1, _2),
         std::bind(&MobileTfPub::handleCancel, this, _1), std::bind(&MobileTfPub::handleAccepted, this, _1));
   }
 
