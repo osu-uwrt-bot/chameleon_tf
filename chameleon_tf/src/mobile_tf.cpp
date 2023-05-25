@@ -172,6 +172,9 @@ public:
 
   void execute(const std::shared_ptr<GHModelFrame> goal_handle)
   {
+    // clear the tf buffer for a sec so we dont have any crud
+    tfBuffer->clear();
+
     rclcpp::Rate loopRate(1);
     const auto goal = goal_handle->get_goal();
     auto feedback = std::make_shared<ModelFrame::Feedback>();
@@ -185,16 +188,10 @@ public:
 
     // confirm connected TF tree
     // check the trasform exists and is connected
-    geometry_msgs::msg::TransformStamped t;
-    try
-    {
-      t = tfBuffer->lookupTransform(goal->monitor_parent, goal->monitor_child, get_clock()->now());
-      transforms.push_back(t.transform);
-    }
-    catch (const tf2::TransformException &ex)
-    {
+    std::string errMsg;
+    if(! tfBuffer->canTransform(goal->monitor_parent, goal->monitor_child, get_clock()->now() + 250ms, 1s, & errMsg)){
       // if we cant lookup, abort
-      result->err_msg = std::string("TF Lookup failed ") + ex.what();
+      result->err_msg = std::string("TF Lookup failed ") + errMsg;
       result->success = false;
 
       goal_handle->abort(result);
@@ -202,8 +199,9 @@ public:
       sampleCount = -1;
       return;
     }
-
+    
     int iterations = 0;
+    geometry_msgs::msg::TransformStamped t;
 
     // take a number of samples
     while (sampleCount < goal->samples)
@@ -211,7 +209,7 @@ public:
       // lookup the current transform
       try
       {
-        t = tfBuffer->lookupTransform(goal->monitor_parent, goal->monitor_child, get_clock()->now());
+        t = tfBuffer->lookupTransform(goal->monitor_parent, goal->monitor_child, get_clock()->now() + 250ms, 1s);
         transforms.push_back(t.transform);
 
         // increment the counter for success
