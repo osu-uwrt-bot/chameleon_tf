@@ -198,6 +198,8 @@ public:
       result->success = false;
 
       goal_handle->abort(result);
+
+      sampleCount = -1;
       return;
     }
 
@@ -226,7 +228,10 @@ public:
         result->err_msg = "Unable to get required samples during expected duration";
         result->success = false;
 
+        sampleCount = -1;
+
         goal_handle->abort(result);
+
         return;
       }
 
@@ -258,6 +263,8 @@ public:
       result->err_msg = "Translation deviation above threshold " + std::to_string(distErr);
       result->success = false;
 
+      sampleCount = -1;
+
       goal_handle->abort(result);
       return;
     }
@@ -270,6 +277,8 @@ public:
       // too high, abort
       result->err_msg = "Rotation deviation above threshold " + std::to_string(rotErr);
       result->success = false;
+
+      sampleCount = -1;
 
       goal_handle->abort(result);
       return;
@@ -290,6 +299,8 @@ public:
     
     result->err_msg = "";
     result->success = true;
+
+    sampleCount = -1;
 
     goal_handle->succeed(result);
   }
