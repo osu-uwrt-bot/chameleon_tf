@@ -194,7 +194,7 @@ public:
     catch (const tf2::TransformException &ex)
     {
       // if we cant lookup, abort
-      result->err_msg = "TF Lookup failed";
+      result->err_msg = std::string("TF Lookup failed ") + ex.what();
       result->success = false;
 
       goal_handle->abort(result);
