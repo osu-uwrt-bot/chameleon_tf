@@ -15,6 +15,7 @@ The initial configuration depends on all of the paramteres to be set. It creates
 * `initial_translation` This is an array of doubles with length 3. those values represent the x, y, and z values between the parent and child frame.
 * `initial_rotation` This is an array of doubles with length 3. The values represent the roll, pitch and yaw between the parent and child frame.
 * `sdtddev_threshold` This is the standard deviation threshold tolerance used when configuring the transform by observation action. 
+* `transform_locks` This is an array of booleans with length 6. The values represent which of the transform axes to not allow updates to be imposed on. If an index is set to true, that axis will become locked during mimick updates and prevent its value from changing.
 
 ## Service Call
 The service call can be used to hard set the transform relationship between the configured frames. the `relationship` field should contain the transform from the paretn frame to the child frame. the service should respond with the `success` flag set and the `err_msg` field as an empty string. If there was somehow an issue, the `success` field will be false, and the `err_msg` populated. 
