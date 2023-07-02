@@ -195,7 +195,7 @@ public:
     // confirm connected TF tree
     // check the trasform exists and is connected
     std::string errMsg;
-    if(! tfBuffer->canTransform(goal->monitor_parent, goal->monitor_child, get_clock()->now() + 250ms, 1s, & errMsg)){
+    if(! tfBuffer->canTransform(goal->monitor_parent, goal->monitor_child, tf2::TimePointZero, 1s, & errMsg)){
       // if we cant lookup, abort
       result->err_msg = std::string("TF Lookup failed ") + errMsg;
       result->success = false;
@@ -215,7 +215,7 @@ public:
       // lookup the current transform
       try
       {
-        t = tfBuffer->lookupTransform(goal->monitor_parent, goal->monitor_child, get_clock()->now() + 250ms, 1s);
+        t = tfBuffer->lookupTransform(goal->monitor_parent, goal->monitor_child, tf2::TimePointZero, 1s);
         transforms.push_back(t.transform);
 
         // increment the counter for success
