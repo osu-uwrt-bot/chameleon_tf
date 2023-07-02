@@ -20,6 +20,14 @@ def generate_launch_description():
                 0.0,
                 0.0
             ]},
+            {"transform_locks": [
+                False,      # unlock x
+                False,      # unlock y
+                True,       # lock z
+                True,       # lock roll
+                True,       # lock pitch
+                False       # unlock yaw
+            ]}
         ]
     )
 
@@ -27,8 +35,11 @@ def generate_launch_description():
         package='tf2_ros',
         executable='static_transform_publisher',
         name='dummy_tf',
-        arguments=["0", "1.0", "1.0", "0", "0", "0", "frame_aa", "frame_bb"]
+        arguments=["0", "1.0", "1.0", "0", "1.571", "0", "frame_aa", "frame_bb"]
     )
+
+    # test action cli call
+    # ros2 action send_goal /frame_b/model_tf chameleon_tf_msgs/action/ModelFrame -f "{monitor_parent: 'frame_aa', monitor_child: 'frame_bb'}"
 
     return launch.LaunchDescription([node, transform])
 

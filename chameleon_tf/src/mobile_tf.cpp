@@ -39,6 +39,9 @@ public:
     // thresholding while observing
     declare_parameter<double>("stddev_threshold", 0.1);
 
+    // lock parameters, order is xyz, rpy 
+    declare_parameter<std::vector<bool>>("transform_locks");
+
     // retrieve param values
     lastRelationship = geometry_msgs::msg::Transform();
 
@@ -50,6 +53,9 @@ public:
     configureInitTF();
 
     stddevLimit = get_parameter("stddev_threshold").as_double();
+
+    // retain the transform locks
+    transformLocks = get_parameter("transform_locks").as_bool_array();
 
     /*
     Create the ROS contexts
@@ -283,7 +289,39 @@ public:
     }
 
     // if still okay, update our transform and succeed
-    lastRelationship = stats.avg;
+
+    // gate the translation updates behind the locks
+    if(! transformLocks.at(0))
+      lastRelationship.translation.x = stats.avg.translation.x;
+
+    if(! transformLocks.at(1))
+      lastRelationship.translation.y = stats.avg.translation.y;
+
+    if(! transformLocks.at(2))
+      lastRelationship.translation.z = stats.avg.translation.z;
+
+
+    double old_roll, old_pitch, old_yaw;
+    double new_roll, new_pitch, new_yaw;
+
+    // convert quats to RPY
+    tf2::Quaternion new_quat, old_quat;
+    tf2::fromMsg(stats.avg.rotation, new_quat);
+    tf2::fromMsg(lastRelationship.rotation, old_quat);
+
+    tf2::Matrix3x3(new_quat).getRPY(new_roll, new_pitch, new_yaw);
+    tf2::Matrix3x3(old_quat).getRPY(new_roll, new_pitch, new_yaw);
+
+    // convert RPY to quaternion after gating
+    tf2::Quaternion update_quat;
+    update_quat.setRPY((! transformLocks.at(3)? new_roll : old_roll),
+                       (! transformLocks.at(4)? new_pitch : old_pitch),
+                       (! transformLocks.at(5)? new_yaw : old_yaw));
+
+    // build the angular quat message
+    lastRelationship.rotation = tf2::toMsg(update_quat);
+
+
 
     RCLCPP_INFO_STREAM(get_logger(), "Assumed translation: (" << lastRelationship.translation.x << ", "
                                                               << lastRelationship.translation.y << ", " 
@@ -316,6 +354,9 @@ protected:
   // make the TF listener contexts
   std::shared_ptr<tf2_ros::TransformListener> tfListener;
   std::unique_ptr<tf2_ros::Buffer> tfBuffer;
+
+  // transform locks 
+  std::vector<bool> transformLocks = {false, false, false, false, false, false};
 
   // ROS contexts
   rclcpp::TimerBase::SharedPtr pubTimer;
