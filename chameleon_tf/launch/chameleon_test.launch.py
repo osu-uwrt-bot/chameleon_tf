@@ -35,7 +35,16 @@ def generate_launch_description():
         package='tf2_ros',
         executable='static_transform_publisher',
         name='dummy_tf',
-        arguments=["0", "1.0", "1.0", "0", "0", "3.14159", "frame_aa", "frame_bb"]
+        arguments=[
+                "--x", "0",
+                "--y", "1.0", 
+                "--z", "1.0", 
+                "--roll", "0", 
+                "--pitch", "0", 
+                "--yaw", "1.5707", 
+                "--frame-id", "frame_aa", 
+                "--child-frame-id", "frame_bb"
+            ]
     )
 
     # test action cli call

@@ -39,7 +39,7 @@ public:
     // thresholding while observing
     declare_parameter<double>("stddev_threshold", 0.1);
 
-    // lock parameters, order is xyz, rpy 
+    // lock parameters, order is xyz, rpy
     declare_parameter<std::vector<bool>>("transform_locks");
 
     // retrieve param values
@@ -195,7 +195,8 @@ public:
     // confirm connected TF tree
     // check the trasform exists and is connected
     std::string errMsg;
-    if(! tfBuffer->canTransform(goal->monitor_parent, goal->monitor_child, tf2::TimePointZero, 1s, & errMsg)){
+    if (!tfBuffer->canTransform(goal->monitor_parent, goal->monitor_child, tf2::TimePointZero, 1s, &errMsg))
+    {
       // if we cant lookup, abort
       result->err_msg = std::string("TF Lookup failed ") + errMsg;
       result->success = false;
@@ -205,7 +206,7 @@ public:
       sampleCount = -1;
       return;
     }
-    
+
     int iterations = 0;
     geometry_msgs::msg::TransformStamped t;
 
@@ -294,18 +295,17 @@ public:
     // if still okay, update our transform and succeed
 
     // gate the translation updates behind the locks
-    if(! transformLocks.at(0))
+    if (!transformLocks.at(0))
       lastRelationship.translation.x = stats.avg.translation.x;
 
-    if(! transformLocks.at(1))
+    if (!transformLocks.at(1))
       lastRelationship.translation.y = stats.avg.translation.y;
 
-    if(! transformLocks.at(2))
+    if (!transformLocks.at(2))
       lastRelationship.translation.z = stats.avg.translation.z;
 
-
-    double old_roll, old_pitch, old_yaw;
     double new_roll, new_pitch, new_yaw;
+    double old_roll, old_pitch, old_yaw;
 
     // convert quats to RPY
     tf2::Quaternion new_quat, old_quat;
@@ -313,29 +313,40 @@ public:
     tf2::fromMsg(lastRelationship.rotation, old_quat);
 
     tf2::Matrix3x3(new_quat).getRPY(new_roll, new_pitch, new_yaw);
-    tf2::Matrix3x3(old_quat).getRPY(new_roll, new_pitch, new_yaw);
+    tf2::Matrix3x3(old_quat).getRPY(old_roll, old_pitch, old_yaw);
+
+    RCLCPP_DEBUG_STREAM(get_logger(), "new rotation: (" << new_roll << ", "
+                                                       << new_pitch << ", "
+                                                       << new_yaw << ")");
+
+    RCLCPP_DEBUG_STREAM(get_logger(), "old rotation: (" << old_roll << ", "
+                                                       << old_pitch << ", "
+                                                       << old_yaw << ")");
+
+    double update_roll = (!transformLocks.at(3) ? new_roll : old_roll),
+           update_pitch = (!transformLocks.at(4) ? new_pitch : old_pitch),
+           update_yaw = (!transformLocks.at(5) ? new_yaw : old_yaw);
+
+    RCLCPP_DEBUG_STREAM(get_logger(), "gated rotation: (" << update_roll << ", "
+                                                         << update_pitch << ", "
+                                                         << update_yaw << ")");
 
     // convert RPY to quaternion after gating
     tf2::Quaternion update_quat;
-    update_quat.setRPY((! transformLocks.at(3)? new_roll : old_roll),
-                       (! transformLocks.at(4)? new_pitch : old_pitch),
-                       (! transformLocks.at(5)? new_yaw : old_yaw));
+    update_quat.setRPY(update_roll, update_pitch, update_yaw);
 
     // build the angular quat message
     lastRelationship.rotation = tf2::toMsg(update_quat);
 
-
-
     RCLCPP_INFO_STREAM(get_logger(), "Assumed translation: (" << lastRelationship.translation.x << ", "
-                                                              << lastRelationship.translation.y << ", " 
+                                                              << lastRelationship.translation.y << ", "
                                                               << lastRelationship.translation.z << ")");
 
-    RCLCPP_INFO_STREAM(get_logger(), "Assumed rotation: (" << lastRelationship.rotation.x << ", " 
+    RCLCPP_INFO_STREAM(get_logger(), "Assumed rotation: (" << lastRelationship.rotation.x << ", "
                                                            << lastRelationship.rotation.y << ", "
-                                                           << lastRelationship.rotation.z << ", " 
+                                                           << lastRelationship.rotation.z << ", "
                                                            << lastRelationship.rotation.w << ")");
 
-    
     result->err_msg = "";
     result->success = true;
 
@@ -358,7 +369,7 @@ protected:
   std::shared_ptr<tf2_ros::TransformListener> tfListener;
   std::unique_ptr<tf2_ros::Buffer> tfBuffer;
 
-  // transform locks 
+  // transform locks
   std::vector<bool> transformLocks = {false, false, false, false, false, false};
 
   // ROS contexts
