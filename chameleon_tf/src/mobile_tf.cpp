@@ -242,6 +242,9 @@ public:
       if (goal_handle->is_canceling())
       {
         RCLCPP_INFO(this->get_logger(), "Cancelling observations");
+
+        sampleCount = -1;
+
         return;
       }
 
